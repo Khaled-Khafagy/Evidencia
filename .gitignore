@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Packaged app output
+release/
+
+# Local per-user config / secrets (should never be committed)
+config.json
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Note: assets/ (icon.png, icon.icns, click-ring.png) IS committed on purpose,
+# so colleagues don't need to regenerate icons (the .icns generator is macOS-only).
+

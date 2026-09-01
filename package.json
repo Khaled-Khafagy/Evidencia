@@ -1,0 +1,65 @@
+{
+  "name": "test-evidence-tool",
+  "version": "1.0.0",
+  "description": "Manual testing evidence capture tool with Jira & Zephyr Scale integration",
+  "license": "MIT",
+  "author": "Khaled Khafagy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Khaled-Khafagy/Evidencia.git"
+  },
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "npm run icon && tsc && npm run copy-assets",
+    "icon": "node scripts/make-icon.js",
+    "copy-assets": "node scripts/copy-assets.js",
+    "start": "npm run build && node scripts/start.js",
+    "dev": "tsc --watch",
+    "dist": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.khafagy.test-evidence-tool",
+    "productName": "Test Evidence Tool",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      "assets/**/*"
+    ],
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dir",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "Not used.",
+        "NSAppleEventsUsageDescription": "Used to capture screen regions for test evidence."
+      }
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": ["portable"]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.61.1",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "docx": "^9.7.1",
+    "form-data": "^4.0.0"
+  }
+}

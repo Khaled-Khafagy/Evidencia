@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Evidence Tool</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Compact recording toolbar (shown while the window is in toolbar mode) -->
+  <div id="recordToolbar" class="record-toolbar">
+    <span class="pulse"></span>
+    <span class="toolbar-frames"><span id="tbFrameCount">0</span> shots</span>
+    <button id="btnTbPause" class="btn-tb btn-tb-pause">⏸ Pause</button>
+    <button id="btnTbStop" class="btn-tb btn-pass">⏹ Stop &amp; Save</button>
+    <button id="btnTbCancel" class="btn-tb btn-abort">✕ Cancel</button>
+  </div>
+
+  <div class="titlebar">
+    <span class="titlebar-title">Test Evidence Tool</span>
+    <nav class="tabs">
+      <button class="tab active" data-tab="capture">Capture</button>
+      <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+  </div>
+
+  <!-- ── CAPTURE TAB ──────────────────────────────── -->
+  <div class="tab-content active" id="tab-capture">
+    <div id="depWarning" class="dep-warning" style="display:none"></div>
+    <div class="panel">
+      <h2>Session Setup</h2>
+
+      <label>Project Key
+        <div class="row-gap">
+          <input id="projectKey" type="text" placeholder="e.g. VRS" />
+          <button id="btnLoadData" class="btn-secondary">Load Project</button>
+        </div>
+      </label>
+
+      <label>Test Cycle
+        <div class="combo-wrap">
+          <input id="testCycleSearch" type="text" class="select-filter" placeholder="🔍 Type to search or click ▾ for all cycles" autocomplete="off" />
+          <button id="cycleCaret" class="combo-caret" type="button" tabindex="-1">▾</button>
+          <div id="cycleSuggestions" class="suggestions"></div>
+        </div>
+        <!-- hidden value-holder; the search box above is the visible control -->
+        <select id="testCycle" style="display:none"><option value="">— select —</option></select>
+      </label>
+
+      <label>Test Case
+        <select id="testCase"><option value="">— select —</option></select>
+      </label>
+    </div>
+
+    <div class="panel">
+      <h2>Capture Region</h2>
+      <div id="regionDisplay" class="region-display">No region selected</div>
+      <button id="btnSelectRegion" class="btn-secondary full-width">🎯 Select Region</button>
+    </div>
+
+    <div class="panel record-panel">
+      <div class="format-hint">Start the recording, then press the <strong>capture hotkey</strong> (set in Settings — default <code>Ctrl/Cmd + Shift + S</code>) each time you want a screenshot of the region. A ring marks the cursor position. The set is exported to a Word document, one screenshot per page.</div>
+      <div class="record-controls">
+        <button id="btnRecord" class="btn-record" disabled>⏺ Start Recording</button>
+        <div id="frameCounter" class="frame-counter" style="display:none">
+          <span class="pulse"></span> <span id="frameCount">0</span> screenshots captured
+        </div>
+      </div>
+      <div id="resultPrompt" class="result-prompt" style="display:none">Set the test case result:</div>
+      <div class="result-buttons" id="resultButtons" style="display:none">
+        <button id="btnPass" class="btn-pass">✓ PASS</button>
+        <button id="btnFail" class="btn-fail">✗ FAIL</button>
+        <button id="btnWip" class="btn-wip">⏳ KEEP IN PROGRESS</button>
+      </div>
+      <div id="statusBar" class="status-bar"></div>
+    </div>
+
+    <!-- Upload panel (shown after recording stops) -->
+    <div class="panel" id="uploadPanel" style="display:none">
+      <h2>Evidence Ready</h2>
+      <div id="gifPreviewWrap"></div>
+      <div class="upload-meta">
+        <span id="uploadSummary"></span>
+        <button id="btnOpenFolder" class="btn-secondary">Open Folder</button>
+      </div>
+      <button id="btnAnnotate" class="btn-secondary full-width">✏️ Annotate / Redact</button>
+      <button id="btnUpload" class="btn-primary full-width">⬆ Upload to Zephyr Scale</button>
+      <div id="uploadLog" class="upload-log"></div>
+    </div>
+  </div>
+
+  <!-- ── HISTORY TAB ──────────────────────────────── -->
+  <div class="tab-content" id="tab-history">
+    <div class="panel">
+      <h2>Session History</h2>
+      <div id="historyList" class="history-list">No sessions yet.</div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS TAB ──────────────────────────────── -->
+  <div class="tab-content" id="tab-settings">
+    <div class="panel">
+      <h2>Jira Cloud</h2>
+      <label>Base URL <input id="jiraBaseUrl" type="text" placeholder="https://yourcompany.atlassian.net" /></label>
+      <label>Email <input id="jiraEmail" type="email" placeholder="you@company.com" /></label>
+      <label>API Token <input id="jiraApiToken" type="password" placeholder="Jira API token" /></label>
+    </div>
+    <div class="panel">
+      <h2>Zephyr Scale</h2>
+      <label>API Token <input id="zephyrApiToken" type="password" placeholder="Zephyr Scale API token" /></label>
+    </div>
+    <div class="panel">
+      <h2>Capture Settings</h2>
+      <label>Capture hotkey
+        <input id="captureHotkey" type="text" placeholder="CommandOrControl+Shift+S" spellcheck="false" autocomplete="off" />
+      </label>
+      <div class="format-hint">
+        Pressed during a recording to take one screenshot. Use Electron accelerator
+        syntax: modifiers <code>CommandOrControl</code>, <code>Shift</code>,
+        <code>Alt</code> joined by <code>+</code>, then one key
+        (e.g. <code>CommandOrControl+Shift+S</code>, <code>Alt+1</code>,
+        <code>F8</code>). It's reserved only while recording.
+      </div>
+      <label class="checkbox-label">
+        <input id="markCursor" type="checkbox" checked />
+        Mark the mouse-cursor position with a ring in each screenshot
+      </label>
+      <label class="checkbox-label">
+        <input id="keepOnTop" type="checkbox" checked />
+        Keep the window above other apps (so it isn't lost behind the browser)
+      </label>
+      <label>Output Directory
+        <div class="row-gap">
+          <input id="outputDir" type="text" readonly />
+          <button id="btnChooseDir" class="btn-secondary">Browse…</button>
+        </div>
+      </label>
+      <label class="checkbox-label">
+        <input id="attachScreenshots" type="checkbox" />
+        Also attach individual full-quality screenshots to execution
+      </label>
+    </div>
+    <button id="btnSaveSettings" class="btn-primary full-width">Save Settings</button>
+    <div id="settingsSaved" class="settings-saved" style="display:none">✓ Saved!</div>
+  </div>
+
+  <!-- ── ANNOTATION / REDACTION EDITOR ──────────────── -->
+  <div id="annotateModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+      <div class="modal-head">
+        <span>Annotate / Redact — per screenshot</span>
+        <button id="btnAnnoClose" class="btn-secondary btn-mini">✕ Close</button>
+      </div>
+      <div class="anno-nav">
+        <button id="btnAnnoPrev" class="btn-secondary btn-mini">◀ Prev</button>
+        <span id="annoCounter" class="anno-counter">1 / 1</span>
+        <button id="btnAnnoNext" class="btn-secondary btn-mini">Next ▶</button>
+        <span class="anno-nav-spacer"></span>
+        <button id="btnAnnoDelete" class="btn-secondary btn-mini btn-danger">🗑 Delete this screenshot</button>
+      </div>
+      <div class="anno-tools">
+        <button class="anno-tool active" data-tool="redact">⬛ Redact</button>
+        <button class="anno-tool" data-tool="box">▭ Box</button>
+        <button class="anno-tool" data-tool="text">🅣 Text</button>
+        <input id="annoText" type="text" placeholder="Label text…" style="display:none" />
+        <button id="btnAnnoUndo" class="btn-secondary btn-mini">↩ Undo</button>
+        <button id="btnAnnoClear" class="btn-secondary btn-mini">🗑 Clear shot</button>
+      </div>
+      <div class="anno-canvas-wrap">
+        <canvas id="annoCanvas"></canvas>
+      </div>
+      <div class="anno-actions">
+        <span class="anno-hint">Drag to draw. Edits apply to the screenshot shown above only.</span>
+        <button id="btnAnnoApply" class="btn-primary">✓ Apply to evidence</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      cursor: crosshair;
+      -webkit-user-select: none; user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    canvas { position: fixed; top: 0; left: 0; display: block; }
+
+    /* Live dimensions badge that follows the drag, like the native picker */
+    #dims {
+      position: fixed;
+      display: none;
+      background: rgba(20, 20, 25, 0.92);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 8px;
+      border-radius: 5px;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    }
+
+    #hint {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(20, 20, 25, 0.85);
+      color: #fff;
+      font-size: 15px;
+      padding: 14px 22px;
+      border-radius: 12px;
+      pointer-events: none;
+      transition: opacity .15s;
+      box-shadow: 0 6px 24px rgba(0,0,0,.5);
+    }
+    #hint kbd {
+      background: rgba(255,255,255,.16);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="dims"></div>
+  <div id="hint">Drag to select the capture region &nbsp;·&nbsp; <kbd>Esc</kbd> to cancel</div>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const hint = document.getElementById('hint');
+    const dims = document.getElementById('dims');
+    const ctx = canvas.getContext('2d');
+
+    // Render at device resolution so the 1px guides stay crisp on Retina.
+    const dpr = window.devicePixelRatio || 1;
+    function sizeCanvas() {
+      canvas.width = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    sizeCanvas();
+    window.addEventListener('resize', () => { sizeCanvas(); paint(); });
+
+    let startX = 0, startY = 0, curX = 0, curY = 0;
+    let isDragging = false;
+
+    function rect() {
+      return {
+        x: Math.min(startX, curX),
+        y: Math.min(startY, curY),
+        w: Math.abs(curX - startX),
+        h: Math.abs(curY - startY),
+      };
+    }
+
+    function paint() {
+      const W = window.innerWidth, H = window.innerHeight;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, W, H);
+      if (!isDragging) return;
+
+      const r = rect();
+      // Punch the selection out of the dim layer so it shows true colours.
+      ctx.clearRect(r.x, r.y, r.w, r.h);
+
+      ctx.strokeStyle = '#e60000';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w, r.h);
+
+      // Corner handles, as on the native selector.
+      ctx.fillStyle = '#e60000';
+      const s = 5;
+      for (const [hx, hy] of [
+        [r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h],
+      ]) ctx.fillRect(hx - s / 2, hy - s / 2, s, s);
+    }
+
+    function showDims() {
+      const r = rect();
+      dims.textContent = `${Math.round(r.w)} × ${Math.round(r.h)}`;
+      dims.style.display = 'block';
+      // Sit above the selection, flipping below when there's no room.
+      let top = r.y - 28;
+      if (top < 4) top = r.y + r.h + 8;
+      dims.style.left = Math.max(4, r.x) + 'px';
+      dims.style.top = top + 'px';
+    }
+
+    window.addEventListener('mousedown', e => {
+      startX = curX = e.clientX;
+      startY = curY = e.clientY;
+      isDragging = true;
+      hint.style.opacity = '0';
+      paint();
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      curX = e.clientX;
+      curY = e.clientY;
+      paint();
+      showDims();
+    });
+
+    window.addEventListener('mouseup', e => {
+      if (!isDragging) return;
+      isDragging = false;
+      curX = e.clientX;
+      curY = e.clientY;
+      const r = rect();
+      // Too small to be a deliberate selection — treat as a cancel.
+      if (r.w < 20 || r.h < 20) {
+        window.api.sendRegionCancelled();
+        return;
+      }
+      window.api.sendRegionSelected({ x: r.x, y: r.y, width: r.w, height: r.h });
+    });
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') window.api.sendRegionCancelled();
+    });
+
+    paint();
+    // Keyboard focus, so Esc works even on the display that wasn't clicked.
+    window.focus();
+  </script>
+</body>
+</html>
