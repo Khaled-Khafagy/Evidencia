@@ -129,9 +129,46 @@ export class ZephyrService {
     return null;
   }
 
+  // Latest result of a test case inside a run, or null if it has none yet.
+  private async getServerRunResult(testCycleKey: string, testCaseKey: string): Promise<any | null> {
+    const results = await this.fetch(`/testrun/${testCycleKey}/testresults`);
+    return (Array.isArray(results) ? results : []).find((r: any) => r.testCaseKey === testCaseKey) || null;
+  }
+
+  // TM4J doesn't cascade the overall status to the steps, so Pass / Not
+  // Executed are applied to every step explicitly. Fail leaves the steps
+  // alone (we can't know which one failed). Undefined = don't touch steps.
+  private async serverScriptResults(
+    testCaseKey: string,
+    status: CreateExecutionParams['status']
+  ): Promise<{ index: number; status: string }[] | undefined> {
+    if (status !== 'Pass' && status !== 'Not Executed') return undefined;
+    try {
+      const tc = await this.fetch(`/testcase/${testCaseKey}`);
+      const steps: any[] = tc.testScript?.steps || [];
+      if (!steps.length) return undefined;
+      return steps.map((s: any, i: number) => ({ index: s.index ?? i, status }));
+    } catch {
+      return undefined;
+    }
+  }
+
   async createTestExecution(params: CreateExecutionParams): Promise<{ id: number; key: string }> {
     if (this.isServer) {
-      const body = { status: params.status, comment: params.comment };
+      const scriptResults = await this.serverScriptResults(params.testCaseKey, params.status);
+      const body = { status: params.status, comment: params.comment, scriptResults };
+      if (params.testCycleKey) {
+        // POST always appends a second result next to the one the cycle
+        // already holds; reuse (PUT) the existing one instead.
+        const existing = await this.getServerRunResult(params.testCycleKey, params.testCaseKey);
+        if (existing?.id) {
+          await this.fetch(
+            `/testrun/${params.testCycleKey}/testcase/${params.testCaseKey}/testresult`,
+            { method: 'PUT', body: JSON.stringify(body) }
+          );
+          return { id: existing.id, key: params.testCycleKey };
+        }
+      }
       const data = params.testCycleKey
         ? await this.fetch(
             `/testrun/${params.testCycleKey}/testcase/${params.testCaseKey}/testresult`,
@@ -170,17 +207,16 @@ export class ZephyrService {
     comment?: string;
   }): Promise<void> {
     if (this.isServer) {
+      const scriptResults = await this.serverScriptResults(params.testCaseKey, params.status);
+      const body = JSON.stringify({ status: params.status, comment: params.comment, scriptResults });
       // TM4J: PUT on the run item updates its latest test result
       if (params.testCycleKey) {
         await this.fetch(
           `/testrun/${params.testCycleKey}/testcase/${params.testCaseKey}/testresult`,
-          { method: 'PUT', body: JSON.stringify({ status: params.status, comment: params.comment }) }
+          { method: 'PUT', body }
         );
       } else {
-        await this.fetch(`/testresult/${params.executionIdOrKey}`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: params.status, comment: params.comment }),
-        });
+        await this.fetch(`/testresult/${params.executionIdOrKey}`, { method: 'PUT', body });
       }
       return;
     }
